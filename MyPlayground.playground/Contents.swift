@@ -1,4 +1,5 @@
 import Foundation
+import PlaygroundSupport
 
 public struct Chip {
     public enum ChipType: UInt32 {
@@ -27,25 +28,29 @@ public struct Chip {
 
 final class Storage {
 
-    private var chipArray: [Chip] = []
-    private var runCount = 0
-    private var isLocked = false
-    private var mutex = NSCondition()
+    var chipArray: [Chip] = []
+    var runCount = 0
+    var isLocked = false
+    let mutex = NSCondition()
 
-    private func pushChip(item: Chip) {
+    func pushChip(item: Chip) {
         mutex.lock()
+
         isLocked = true
         chipArray.append(item)
         runCount += 1
+
         mutex.signal()
         mutex.unlock()
     }
 
-    private func removeLast() -> Chip {
+    func removeLast() -> Chip {
         mutex.lock()
-        while !isLocked {
+
+        while(!isLocked) {
             mutex.wait()
         }
+
         isLocked = false
         mutex.unlock()
         return chipArray.removeLast()
@@ -53,19 +58,47 @@ final class Storage {
 }
 
 
-final class GeneratingThread: Thread {
-    
-    let storage = Storage()
+class GeneratingThread: Thread {
+
+    private let storage: Storage
+
+    init(storage: Storage) {
+        self.storage = storage
+    }
 
     override func main() {
-        let timer = Timer(timeInterval: 2, repeats: true) { timer in
-            storage.pushChip(item: Chip.make())
-            if storage.runCount == 20 {
-                timer.invalidate()
-            }
-        }
+        let timer = Timer.scheduledTimer(timeInterval: 2.0, target: self,
+                                         selector: #selector(timerMethod),
+                                         userInfo: nil,
+                                         repeats: true)
+        RunLoop.current.add(timer, forMode: .common)
+        RunLoop.current.run(until: Date.init(timeIntervalSinceNow: 20.0))
+    }
+
+    @objc func timerMethod() {
+        storage.pushChip(item: Chip.make())
     }
 }
 
-let generate = GeneratingThread()
+
+
+class WorkingThread: Thread {
+    
+    private let storage: Storage
+
+    init(storage: Storage) {
+        self.storage = storage
+    }
+    override func main() {
+        repeat {
+            storage.removeLast().sodering()
+        } while storage.chipArray.isEmpty || storage.isLocked
+    }
+}
+
+let storage = Storage()
+let generate = GeneratingThread(storage: storage)
+let working = WorkingThread(storage: storage)
+
 generate.start()
+working.start()
