@@ -25,3 +25,32 @@ public struct Chip {
 
 
 
+final class Storage {
+
+    private var chipArray: [Chip] = []
+    private var runCount = 0
+    private var isLocked = false
+    private var mutex = NSCondition()
+
+    private func pushChip(item: Chip) {
+        mutex.lock()
+        isLocked = true
+        chipArray.append(item)
+        runCount += 1
+        mutex.signal()
+        mutex.unlock()
+    }
+
+    private func removeLast() -> Chip {
+        mutex.lock()
+        while !isLocked {
+            mutex.wait()
+        }
+        isLocked = false
+        mutex.unlock()
+        return chipArray.removeLast()
+    }
+}
+
+
+
