@@ -53,4 +53,19 @@ final class Storage {
 }
 
 
+final class GeneratingThread: Thread {
+    
+    let storage = Storage()
 
+    override func main() {
+        let timer = Timer(timeInterval: 2, repeats: true) { timer in
+            storage.pushChip(item: Chip.make())
+            if storage.runCount == 20 {
+                timer.invalidate()
+            }
+        }
+    }
+}
+
+let generate = GeneratingThread()
+generate.start()
